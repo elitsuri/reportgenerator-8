@@ -38,3 +38,7 @@ htmlcov/
 *.p12
 secrets.json
 credentials.json
+
+# Environment and secret files
+*.env
+.env.local
