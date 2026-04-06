@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>reportgenerator</title>
+  <style>
+    :root {
+      --color-primary: #f43f5e;
+      --color-secondary: #e11d48;
+      --color-accent: #fda4af;
+      --color-bg: #0f172a;
+      --color-surface: #1e293b;
+      --color-text: #f1f5f9;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--color-bg); color: var(--color-text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+    #app { display: flex; flex-direction: column; min-height: 100vh; }
+    nav { background: var(--color-surface); padding: 0.75rem 1.5rem; display: flex; align-items: center; gap: 1rem; border-bottom: 2px solid var(--color-primary); }
+    nav .logo { font-size: 1.25rem; font-weight: 700; color: var(--color-primary); }
+    nav .nav-links { display: flex; gap: 0.5rem; margin-left: auto; }
+    nav .nav-links button { background: transparent; border: 1px solid var(--color-primary); color: var(--color-primary); padding: 0.4rem 0.9rem; border-radius: 6px; cursor: pointer; transition: all .2s; }
+    nav .nav-links button:hover { background: var(--color-primary); color: #fff; }
+    main { flex: 1; padding: 1.5rem; max-width: 1200px; margin: 0 auto; width: 100%; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .card { background: var(--color-surface); border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .stat-card { background: var(--color-surface); border-radius: 10px; padding: 1.25rem; border-left: 4px solid var(--color-primary); }
+    .stat-card .val { font-size: 2rem; font-weight: 700; color: var(--color-primary); }
+    .stat-card .lbl { font-size: 0.8rem; opacity: .7; margin-top: .25rem; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: .6rem .8rem; text-align: left; border-bottom: 1px solid rgba(255,255,255,.06); }
+    th { color: var(--color-accent); font-size: .8rem; text-transform: uppercase; }
+    .btn { background: var(--color-primary); color: #fff; border: none; padding: .5rem 1.1rem; border-radius: 6px; cursor: pointer; transition: opacity .2s; }
+    .btn:hover { opacity: .8; }
+    .btn-danger { background: #ef4444; }
+    input, select, textarea { background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.15); color: var(--color-text); padding: .5rem .8rem; border-radius: 6px; width: 100%; margin-bottom: .75rem; }
+    .form-row { display: flex; gap: .75rem; }
+    .form-row input { flex: 1; }
+    .notif-item { display: flex; align-items: center; gap: .75rem; padding: .6rem 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+    .notif-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-accent); flex-shrink: 0; }
+    .notif-dot.read { background: transparent; border: 1px solid rgba(255,255,255,.3); }
+    #auth-panel { max-width: 420px; margin: 4rem auto; }
+    .tab-btns { display: flex; gap: .5rem; margin-bottom: 1rem; }
+    .tab-btns button { background: transparent; border: 1px solid rgba(255,255,255,.2); color: var(--color-text); padding: .4rem .9rem; border-radius: 6px; cursor: pointer; }
+    .tab-btns button.active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+    .hidden { display: none !important; }
+    #toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--color-primary); color: #fff; padding: .7rem 1.2rem; border-radius: 8px; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 999; }
+    svg.sparkline { display: block; }
+    .sparkline-wrap { overflow: hidden; border-radius: 8px; margin-top: .5rem; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <nav>
+    <span class="logo">reportgenerator</span>
+    <div class="nav-links" id="nav-links">
+      <button onclick="showPanel('dashboard')">Dashboard</button>
+      <button onclick="showPanel('items')">Items</button>
+      <button onclick="showPanel('notifications')">Notifications</button>
+      <button onclick="showPanel('analytics')">Analytics</button>
+      <button onclick="showPanel('settings')">Settings</button>
+      <button onclick="logout()" style="border-color:#ef4444;color:#ef4444">Logout</button>
+    </div>
+  </nav>
+  <main>
+    <div id="auth-panel" class="panel active">
+      <div class="card">
+        <div class="tab-btns">
+          <button class="active" onclick="switchAuthTab('login')">Login</button>
+          <button onclick="switchAuthTab('register')">Register</button>
+        </div>
+        <div id="login-form">
+          <input type="email" id="login-email" placeholder="Email">
+          <input type="password" id="login-password" placeholder="Password">
+          <button class="btn" onclick="doLogin()">Sign In</button>
+        </div>
+        <div id="register-form" class="hidden">
+          <input type="text" id="reg-name" placeholder="Full Name">
+          <input type="email" id="reg-email" placeholder="Email">
+          <input type="password" id="reg-password" placeholder="Password">
+          <button class="btn" onclick="doRegister()">Create Account</button>
+        </div>
+      </div>
+    </div>
+    <div id="dashboard-panel" class="panel">
+      <div class="stats-grid" id="stats-grid"></div>
+    </div>
+    <div id="items-panel" class="panel">
+      <div class="card">
+        <div class="form-row" style="margin-bottom:.75rem">
+          <input id="search-q" placeholder="Search items...">
+          <button class="btn" onclick="searchItems()">Search</button>
+          <button class="btn" onclick="openItemForm()">+ New</button>
+        </div>
+        <div id="item-form" class="hidden" style="margin-bottom:.75rem">
+          <input id="item-title" placeholder="Title">
+          <textarea id="item-desc" placeholder="Description" rows="2"></textarea>
+          <button class="btn" onclick="saveItem()">Save</button>
+          <button class="btn" style="background:transparent;border:1px solid #fff" onclick="closeItemForm()">Cancel</button>
+        </div>
+        <table><thead><tr><th>ID</th><th>Title</th><th>Actions</th></tr></thead>
+        <tbody id="items-tbody"></tbody></table>
+      </div>
+    </div>
+    <div id="notifications-panel" class="panel">
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
+          <h3>Notifications</h3>
+          <button class="btn" onclick="markAllRead()" style="margin-left:auto">Mark all read</button>
+        </div>
+        <div id="notifs-list"></div>
+      </div>
+    </div>
+    <div id="analytics-panel" class="panel">
+      <div class="card">
+        <h3 style="margin-bottom:1rem">Items over time</h3>
+        <div class="sparkline-wrap" id="sparkline-wrap"></div>
+      </div>
+    </div>
+    <div id="settings-panel" class="panel">
+      <div class="card" style="max-width:480px">
+        <h3 style="margin-bottom:1rem">User Settings</h3>
+        <label>Theme</label>
+        <select id="s-theme"><option value="dark">Dark</option><option value="light">Light</option></select>
+        <label>Language</label>
+        <select id="s-lang"><option value="en">English</option><option value="es">Spanish</option></select>
+        <label>Timezone</label>
+        <input id="s-tz" value="UTC">
+        <label><input type="checkbox" id="s-notifs" style="width:auto;margin:0 .4rem 0 0"> Enable notifications</label><br><br>
+        <button class="btn" onclick="saveSettings()">Save Settings</button>
+      </div>
+    </div>
+  </main>
+</div>
+<div id="toast"></div>
+<script>
+const API = '/api/v1';
+let token = localStorage.getItem('token') || '';
+let editItemId = null;
+function h(tag, attrs, ...children) {
+  const el = document.createElement(tag);
+  Object.entries(attrs || {}).forEach(([k,v]) => el.setAttribute(k, v));
+  children.forEach(c => el.append(typeof c === 'string' ? document.createTextNode(c) : c));
+  return el;
+}
+function toast(msg, err) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = err ? '#ef4444' : 'var(--color-primary)';
+  t.style.opacity = '1';
+  setTimeout(() => t.style.opacity = '0', 3000);
+}
+function headers() { return { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) }; }
+async function api(method, path, body) {
+  const r = await fetch(API + path, { method, headers: headers(), body: body ? JSON.stringify(body) : undefined });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.detail || r.statusText); }
+  if (r.status === 204) return null;
+  return r.json();
+}
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(name + '-panel').classList.add('active');
+  if (name === 'dashboard') loadDashboard();
+  if (name === 'items') loadItems();
+  if (name === 'notifications') loadNotifications();
+  if (name === 'analytics') loadAnalytics();
+  if (name === 'settings') loadSettings();
+}
+function switchAuthTab(tab) {
+  document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
+  document.getElementById('register-form').classList.toggle('hidden', tab !== 'register');
+  document.querySelectorAll('.tab-btns button').forEach((b,i) => b.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='register')));
+}
+async function doLogin() {
+  const email = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+  try {
+    const r = await fetch(API + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `username=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}` });
+    if (!r.ok) throw new Error('Invalid credentials');
+    const d = await r.json();
+    token = d.access_token;
+    localStorage.setItem('token', token);
+    document.getElementById('auth-panel').classList.remove('active');
+    document.getElementById('nav-links').style.display = 'flex';
+    showPanel('dashboard');
+    toast('Logged in!');
+  } catch(e) { toast(e.message, true); }
+}
+async function doRegister() {
+  const body = { email: document.getElementById('reg-email').value, full_name: document.getElementById('reg-name').value, password: document.getElementById('reg-password').value };
+  try { await api('POST', '/auth/register', body); toast('Registered! Please log in.'); switchAuthTab('login'); }
+  catch(e) { toast(e.message, true); }
+}
+function logout() { token = ''; localStorage.removeItem('token'); location.reload(); }
+async function loadDashboard() {
+  try {
+    const d = await api('GET', '/analytics/overview');
+    const grid = document.getElementById('stats-grid');
+    grid.innerHTML = '';
+    [['Total Items', d.total_items], ['Total Users', d.total_users], ['Notifications', d.total_notifications], ['Items This Week', d.items_this_week]].forEach(([l,v]) => {
+      grid.innerHTML += `<div class="stat-card"><div class="val">${v}</div><div class="lbl">${l}</div></div>`;
+    });
+  } catch(e) { toast(e.message, true); }
+}
+async function loadItems() {
+  try {
+    const d = await api('GET', '/items/');
+    const tbody = document.getElementById('items-tbody');
+    tbody.innerHTML = '';
+    (d.items || d).forEach(item => {
+      tbody.innerHTML += `<tr><td>${item.id}</td><td>${item.title}</td><td><button class="btn" style="padding:.3rem .6rem;font-size:.8rem" onclick="editItem(${item.id},'${item.title.replace(/'/g,"\\'")}')">Edit</button> <button class="btn btn-danger" style="padding:.3rem .6rem;font-size:.8rem" onclick="deleteItem(${item.id})">Del</button></td></tr>`;
+    });
+  } catch(e) { toast(e.message, true); }
+}
+async function searchItems() {
+  const q = document.getElementById('search-q').value;
+  if (!q) return loadItems();
+  try {
+    const d = await api('GET', `/search/?q=${encodeURIComponent(q)}&type=items`);
+    const tbody = document.getElementById('items-tbody');
+    tbody.innerHTML = '';
+    (d.items || []).forEach(item => { tbody.innerHTML += `<tr><td>${item.id}</td><td>${item.title}</td><td></td></tr>`; });
+  } catch(e) { toast(e.message, true); }
+}
+function openItemForm() { editItemId = null; document.getElementById('item-form').classList.remove('hidden'); document.getElementById('item-title').value=''; document.getElementById('item-desc').value=''; }
+function editItem(id, title) { editItemId = id; document.getElementById('item-form').classList.remove('hidden'); document.getElementById('item-title').value = title; }
+function closeItemForm() { document.getElementById('item-form').classList.add('hidden'); editItemId = null; }
+async function saveItem() {
+  const title = document.getElementById('item-title').value;
+  const description = document.getElementById('item-desc').value;
+  try {
+    if (editItemId) { await api('PUT', `/items/${editItemId}`, { title, description }); toast('Item updated'); }
+    else { await api('POST', '/items/', { title, description }); toast('Item created'); }
+    closeItemForm(); loadItems();
+  } catch(e) { toast(e.message, true); }
+}
+async function deleteItem(id) {
+  if (!confirm('Delete this item?')) return;
+  try { await api('DELETE', `/items/${id}`); toast('Deleted'); loadItems(); }
+  catch(e) { toast(e.message, true); }
+}
+async function loadNotifications() {
+  try {
+    const d = await api('GET', '/notifications/');
+    const list = document.getElementById('notifs-list');
+    list.innerHTML = d.items.length ? '' : '<p style="opacity:.5">No notifications</p>';
+    d.items.forEach(n => {
+      list.innerHTML += `<div class="notif-item"><div class="notif-dot ${n.read?'read':''}"></div><div><strong>${n.title}</strong><br><small>${n.body}</small></div></div>`;
+    });
+  } catch(e) { toast(e.message, true); }
+}
+async function markAllRead() {
+  try { await api('POST', '/notifications/read-all'); toast('All marked read'); loadNotifications(); }
+  catch(e) { toast(e.message, true); }
+}
+async function loadAnalytics() {
+  try {
+    const d = await api('GET', '/analytics/timeseries?days=30');
+    const wrap = document.getElementById('sparkline-wrap');
+    if (!d.points.length) { wrap.innerHTML = '<p style="opacity:.5">No data</p>'; return; }
+    const vals = d.points.map(p => p.count);
+    const max = Math.max(...vals, 1);
+    const W = 600, H = 80, step = W / (vals.length - 1 || 1);
+    const pts = vals.map((v,i) => `${i*step},${H - (v/max)*H*0.9}`).join(' ');
+    wrap.innerHTML = `<svg class="sparkline" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg"><polyline fill="none" stroke="#f43f5e" stroke-width="2" points="${pts}"/></svg>`;
+  } catch(e) { toast(e.message, true); }
+}
+async function loadSettings() {
+  try {
+    const d = await api('GET', '/settings/');
+    document.getElementById('s-theme').value = d.theme;
+    document.getElementById('s-lang').value = d.language;
+    document.getElementById('s-tz').value = d.timezone;
+    document.getElementById('s-notifs').checked = d.notifications_enabled;
+  } catch(e) { toast(e.message, true); }
+}
+async function saveSettings() {
+  const body = { theme: document.getElementById('s-theme').value, language: document.getElementById('s-lang').value, timezone: document.getElementById('s-tz').value, notifications_enabled: document.getElementById('s-notifs').checked };
+  try { await api('PUT', '/settings/', body); toast('Settings saved'); }
+  catch(e) { toast(e.message, true); }
+}
+if (token) { document.getElementById('auth-panel').classList.remove('active'); showPanel('dashboard'); }
+else { document.getElementById('nav-links').style.display = 'none'; }
+</script>
+</body>
+</html>
